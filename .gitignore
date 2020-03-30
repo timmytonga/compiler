@@ -1,0 +1,6 @@
+submissions/
+target/
+.idea/
+*.iml
+a.s
+autotest.bin
