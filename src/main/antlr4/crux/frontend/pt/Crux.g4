@@ -31,9 +31,9 @@ functionDefinition  : Func Identifier Open_Paren parameterList Close_Paren Colon
 declaration     : variableDeclaration | arrayDeclaration | functionDefinition;
 declarationList : declaration*;
 
-assignmentStatement : Let designator Equal expression0 SemiColon;
+assignmentStatement : Let designator Assign expression0 SemiColon;
 callStatement   : callExpression SemiColon;
-ifStatement     : If expression0 statementBlock (Else statementBlock);
+ifStatement     : If expression0 statementBlock (Else statementBlock)?;
 whileStatement  : While expression0 statementBlock;
 returnStatement : Return expression0 SemiColon;
 statement       : variableDeclaration | callStatement | assignmentStatement | ifStatement | whileStatement | returnStatement;
