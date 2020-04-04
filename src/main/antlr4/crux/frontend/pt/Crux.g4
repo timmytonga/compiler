@@ -44,7 +44,7 @@ statementBlock  : Open_Brace statementList Close_Brace;
     Lexer rules
  */
 
-/* Reserved keywords  */
+/* Reserved keywords */
 And     : 'and';
 Or      : 'or';
 Not     : 'not';
