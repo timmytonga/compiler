@@ -190,10 +190,15 @@ public final class ParseTreeLower {
          * recursively before using those returned AST nodes to construct {@link IfElseBranch} object.
          * @return an AST {@link IfElseBranch}
          * */
-
         @Override
         public Statement visitIfStatement(CruxParser.IfStatementContext ctx) {
-            return null;
+            Expression condition = expressionVisitor.visitExpression0(ctx.expression0());
+            StatementList thenBlock = lower(ctx.statementBlock(0));
+            StatementList elseBlock = new StatementList(makePosition(ctx),new ArrayList<>());
+            if (ctx.Else() != null){
+                elseBlock = lower(ctx.statementBlock(1));
+            }
+            return new IfElseBranch(makePosition(ctx), condition, thenBlock, elseBlock);
         }
 
 
@@ -213,10 +218,10 @@ public final class ParseTreeLower {
          * Here we show a simple example of how to lower a simple parse tree construction.
          * @return an AST {@link Return}
          * */
-
         @Override
         public Statement visitReturnStatement(CruxParser.ReturnStatementContext ctx) {
-            return null;
+            Expression value = expressionVisitor.visitExpression0(ctx.expression0());
+            return new Return(makePosition(ctx), value);
         }
 
 
@@ -254,7 +259,7 @@ public final class ParseTreeLower {
                 }
                 Expression left = expressionVisitor.visitExpression1(ctx.expression1(0));
                 Expression right = expressionVisitor.visitExpression1(ctx.expression1(1));
-                return new OpExpr(makePosition(ctx), op, left, right);
+                return new OpExpr(makePosition(ctx.op0()), op, left, right);
             }
         }
 
