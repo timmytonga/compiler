@@ -84,7 +84,8 @@ public final class ParseTreeLower {
             } else if (statement.returnStatement() != null) {
                 result.add(statement.returnStatement().accept(statementVisitor));
             } else {
-                // error?
+                return null;  // idk what to do here...
+//                throw new Exception("reached else statement in lower(CruxParser.StatementListContext)");
             }
         }
         return new StatementList(makePosition(statementList), result);
@@ -210,7 +211,9 @@ public final class ParseTreeLower {
          * */
         @Override
         public Statement visitWhileStatement(CruxParser.WhileStatementContext ctx) {
-            return null;
+            Expression condition = expressionVisitor.visitExpression0(ctx.expression0());
+            StatementList body = lower(ctx.statementBlock());
+            return new WhileLoop(makePosition(ctx), condition, body);
         }
 
         /**
