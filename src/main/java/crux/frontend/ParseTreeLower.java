@@ -45,7 +45,7 @@ public final class ParseTreeLower {
     public boolean hasEncounteredError() {
         return false;
     }
-  
+
     /**
      * Lower top-level parse tree to AST
      * @return a {@link DeclarationList} object representing the top-level AST.
@@ -89,16 +89,17 @@ public final class ParseTreeLower {
         }
         return new StatementList(makePosition(statementList), result);
     }
-  
+
     /**
      * Similar to {@link #lower(CruxParser.StatementListContext)}, but handling symbol table
      * as well.
      * @return a {@link StatementList} AST object.
      * */
-  /*
     private StatementList lower(CruxParser.StatementBlockContext statementBlock) {
+        // todo
+        return lower(statementBlock.statementList());
     }
-  */
+
 
     /**
      * A parse tree visitor to create AST nodes derived from {@link Declaration}
@@ -110,7 +111,9 @@ public final class ParseTreeLower {
          * */
         @Override
         public VariableDeclaration visitVariableDeclaration(CruxParser.VariableDeclarationContext ctx) {
-            return null;
+            return new VariableDeclaration(makePosition(ctx),
+                    new Symbol(ctx.Identifier().getSymbol().getText()));
+//                           , ctx.type().Identifier().getSymbol().getText()));
         }
 
         /**
@@ -132,11 +135,9 @@ public final class ParseTreeLower {
 //                    , ctx.type().Identifier().getSymbol().getText());
             List<Symbol> params = new ArrayList<>();
             for (CruxParser.ParameterContext param : ctx.parameterList().parameter()){
-                params.add(
-                        new Symbol(param.Identifier().getSymbol().getText(),
-                                param.type().Identifier().getSymbol().getText()));
+                params.add(new Symbol(param.Identifier().getSymbol().getText()));
             }
-            StatementList statements = lower(ctx.statementBlock().statementList());  // lower statementlist
+            StatementList statements = lower(ctx.statementBlock());  // lower statementlist
             return new FunctionDefinition(makePosition(ctx), symb, params, statements);
         }
     }
@@ -157,14 +158,16 @@ public final class ParseTreeLower {
             return declarationVisitor.visitVariableDeclaration(ctx);
         }
 
-      
+
         /**
          * Visit a parse tree assignment statement and create an AST {@link Assignment}
          * @return an AST {@link Assignment}
          * */
         @Override
         public Statement visitAssignmentStatement(CruxParser.AssignmentStatementContext ctx) {
-            return null;
+            return new Assignment(makePosition(ctx),
+                    locationVisitor.visitDesignator(ctx.designator()),
+                    expressionVisitor.visitExpression0(ctx.expression0()));
         }
 
 
@@ -180,18 +183,19 @@ public final class ParseTreeLower {
             return expressionVisitor.visitCallExpression(ctx.callExpression());
         }
 
-          
+
         /**
          * Visit a parse tree if-else branch and create an AST {@link IfElseBranch}.
          * The template code shows partial implementations that visit the then block and else block
          * recursively before using those returned AST nodes to construct {@link IfElseBranch} object.
          * @return an AST {@link IfElseBranch}
          * */
-      /*
+
         @Override
         public Statement visitIfStatement(CruxParser.IfStatementContext ctx) {
+            return null;
         }
-      */
+
 
         /**
          * Visit a parse tree while loop and create an AST {@link WhileLoop}.
@@ -209,11 +213,12 @@ public final class ParseTreeLower {
          * Here we show a simple example of how to lower a simple parse tree construction.
          * @return an AST {@link Return}
          * */
-      /*
+
         @Override
         public Statement visitReturnStatement(CruxParser.ReturnStatementContext ctx) {
+            return null;
         }
-      */
+
 
     }
 
@@ -340,7 +345,7 @@ public final class ParseTreeLower {
                 return null;
             }
         }
-      
+
 
         @Override
         public Call visitCallExpression(CruxParser.CallExpressionContext ctx) {
@@ -353,12 +358,31 @@ public final class ParseTreeLower {
         }
 
 
-      /*
         @Override
         public Expression visitDesignator(CruxParser.DesignatorContext ctx) {
-            // TODO
+            if (ctx.expression0().size() == 0){
+                if (dereferenceDesignator){
+                    return new Dereference(makePosition(ctx), new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText())));
+                } else {
+                    return new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText()));
+                }
+            } else if (ctx.expression0().size() == 1){
+                if (dereferenceDesignator) {
+                    return new Dereference(makePosition(ctx), new ArrayAccess(
+                                makePosition(ctx),
+                                new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText())),
+                                expressionVisitor.visitExpression0(ctx.expression0(0))));
+                } else {
+                    return new ArrayAccess(
+                            makePosition(ctx),
+                            new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText())),
+                            expressionVisitor.visitExpression0(ctx.expression0(0)));
+                }
+            } else {
+                // todo??
+                return null;
+            }
         }
-      */
 
 
         @Override
