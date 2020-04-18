@@ -17,6 +17,8 @@ final class SymbolTable {
 
     SymbolTable(PrintStream err) {
         this.err = err;
+        Map<String, Symbol> firstScope = new HashMap<>();
+        symbolScopes.add(firstScope);
         // TODO
     }
 
@@ -24,17 +26,24 @@ final class SymbolTable {
         return encounteredError;
     }
 
-    void enter() {
-        // TODO
+    void enter() {  // enter a scope --> make a new symboltable???
+        Map<String, Symbol> newScope = new HashMap<>();
+        symbolScopes.add(newScope);
     }
 
-    void exit() {
-        // TODO
+    void exit() {  // exit a scope --> pop the stack?
+        symbolScopes.remove(symbolScopes.size()-1);
     }
 
     Symbol add(Position pos, String name) {
-        // TODO
-        return null;
+        if (symbolScopes.get(symbolScopes.size()-1).containsKey(name)){
+            err.printf("DeclareSymbolError%s[%s already exists.]%n", pos, name);
+            encounteredError = true;
+            return new Symbol(name, "DeclareSymbolError");
+        }
+        Symbol sym = new Symbol(name);
+        symbolScopes.get(symbolScopes.size()-1).put(name, sym);
+        return sym;
     }
 
     Symbol add(Position pos, String name, Type type) {
@@ -54,7 +63,10 @@ final class SymbolTable {
     }
 
     private Symbol find(String name) {
-        // TODO
+        for (int i = symbolScopes.size()-1; i>=0; i--){
+            Map<String, Symbol> scope = symbolScopes.get(i);
+            if (scope.get(name) != null) return scope.get(name);
+        }
         return null;
     }
 }

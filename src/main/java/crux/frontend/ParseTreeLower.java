@@ -43,7 +43,7 @@ public final class ParseTreeLower {
      * Should returns true if we have encountered an error.
      */
     public boolean hasEncounteredError() {
-        return false;
+        return symTab.hasEncounteredError();
     }
 
     /**
@@ -61,7 +61,10 @@ public final class ParseTreeLower {
                 result.add(declaration.arrayDeclaration().accept(declarationVisitor));
             }
         }
-        return new DeclarationList(makePosition(program), result);
+        if (hasEncounteredError()) // handle error here
+            return null;
+        else
+            return new DeclarationList(makePosition(program), result);
     }
 
     /**
@@ -97,8 +100,10 @@ public final class ParseTreeLower {
      * @return a {@link StatementList} AST object.
      * */
     private StatementList lower(CruxParser.StatementBlockContext statementBlock) {
-        // todo
-        return lower(statementBlock.statementList());
+        symTab.enter();
+        StatementList result = lower(statementBlock.statementList());
+        symTab.exit();
+        return result;
     }
 
 
@@ -112,9 +117,10 @@ public final class ParseTreeLower {
          * */
         @Override
         public VariableDeclaration visitVariableDeclaration(CruxParser.VariableDeclarationContext ctx) {
-            return new VariableDeclaration(makePosition(ctx),
-                    new Symbol(ctx.Identifier().getSymbol().getText()));
-//                           , ctx.type().Identifier().getSymbol().getText()));
+            String name = ctx.Identifier().getSymbol().getText();
+            Position pos = makePosition(ctx);
+            Symbol symbol = symTab.add(pos, name);
+            return new VariableDeclaration(pos, symbol);
         }
 
         /**
@@ -123,7 +129,10 @@ public final class ParseTreeLower {
          * */
         @Override
         public ArrayDeclaration visitArrayDeclaration(CruxParser.ArrayDeclarationContext ctx) {
-            return new ArrayDeclaration(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText()));
+            String name = ctx.Identifier().getSymbol().getText();
+            Position pos = makePosition(ctx);
+            Symbol symbol = symTab.add(pos, name);
+            return new ArrayDeclaration(pos, symbol);
         }
 
         /**
