@@ -128,8 +128,8 @@ public final class ParseTreeLower {
          * */
         @Override
         public FunctionDefinition visitFunctionDefinition(CruxParser.FunctionDefinitionContext ctx) {
-            Symbol symb = new Symbol(ctx.Identifier().getSymbol().getText(),
-                    ctx.type().Identifier().getSymbol().getText());
+            Symbol symb = new Symbol(ctx.Identifier().getSymbol().getText());
+//                    , ctx.type().Identifier().getSymbol().getText());
             List<Symbol> params = new ArrayList<>();
             for (CruxParser.ParameterContext param : ctx.parameterList().parameter()){
                 params.add(
@@ -199,11 +199,10 @@ public final class ParseTreeLower {
          * to decompose this construction.
          * @return an AST {@link WhileLoop}
          * */
-      /*
         @Override
         public Statement visitWhileStatement(CruxParser.WhileStatementContext ctx) {
+            return null;
         }
-      */
 
         /**
          * Visit a parse tree return statement and create an AST {@link Return}.
@@ -231,31 +230,116 @@ public final class ParseTreeLower {
             if( ctx.op0() == null ){    // only one expression 1
                 return expressionVisitor.visitExpression1(ctx.expression1(0));
             } else {
+                Operation op;
+                if (ctx.op0().Greater_equal() != null){
+                    op = Operation.GE;
+                } else if (ctx.op0().Lesser_equal() != null){
+                    op = Operation.LE;
+                } else if (ctx.op0().Not_equal() != null){
+                    op = Operation.NE;
+                } else if (ctx.op0().Equal() != null){
+                    op = Operation.EQ;
+                } else if (ctx.op0().Greater_than() != null){
+                    op = Operation.GT;
+                } else if (ctx.op0().Less_than() != null){
+                    op = Operation.LT;
+                } else {
+                    op = null;
+                    // error ??
+                }
+                Expression left = expressionVisitor.visitExpression1(ctx.expression1(0));
+                Expression right = expressionVisitor.visitExpression1(ctx.expression1(1));
+                return new OpExpr(makePosition(ctx), op, left, right);
+            }
+        }
+
+
+        private Operation getOp1(CruxParser.Op1Context ctx){
+            if (ctx.Add() != null) {
+                return Operation.ADD;
+            } else if (ctx.Sub() != null) {
+                return Operation.SUB;
+            } else if (ctx.Or() != null) {
+                return Operation.LOGIC_OR;
+            } else {
+                // error
                 return null;
+            }
+        }
+
+
+        @Override
+        public Expression visitExpression1(CruxParser.Expression1Context ctx) {
+            if(ctx.op1().size() == 0){  // should be only one expression2
+                return expressionVisitor.visitExpression2(ctx.expression2(0));
+            } else { // there are multiple op1... we build a opexpr for each
+                OpExpr curr = new OpExpr(makePosition(ctx.op1(0)), getOp1(ctx.op1(0)),
+                        expressionVisitor.visitExpression2(ctx.expression2(0)),
+                        expressionVisitor.visitExpression2(ctx.expression2(1)));
+                for (int i = 1; i < ctx.op1().size(); i++){
+                    curr = new OpExpr(makePosition(ctx.op1(i)),
+                            getOp1(ctx.op1(i)),
+                            curr,
+                            expressionVisitor.visitExpression2(ctx.expression2(i+1)));
+                }
+                return curr;
+            }
+        }
+
+
+        private Operation getOp2(CruxParser.Op2Context ctx){
+            if (ctx.And() != null) {
+                return Operation.LOGIC_AND;
+            } else if (ctx.Div() != null) {
+                return Operation.DIV;
+            } else if (ctx.Mul() != null) {
+                return Operation.MULT;
+            } else {
+                // error
+                return null;
+            }
+        }
+
+
+        @Override
+        public Expression visitExpression2(CruxParser.Expression2Context ctx) {
+            if(ctx.op2().size() == 0){  // should be only one expression2
+                return expressionVisitor.visitExpression3(ctx.expression3(0));
+            } else { // there are multiple op1... we build a opexpr for each
+                OpExpr curr = new OpExpr(makePosition(ctx.op2(0)), getOp2(ctx.op2(0)),
+                        expressionVisitor.visitExpression3(ctx.expression3(0)),
+                        expressionVisitor.visitExpression3(ctx.expression3(1)));
+                for (int i = 1; i < ctx.op2().size(); i++){
+                    curr = new OpExpr(makePosition(ctx.op2(i)),
+                            getOp2(ctx.op2(i)),
+                            curr,
+                            expressionVisitor.visitExpression3(ctx.expression3(i+1)));
+                }
+                return curr;
             }
         }
 
 
 
         @Override
-        public Expression visitExpression1(CruxParser.Expression1Context ctx) {
-            return null;
-        }
-
-      
-
-        @Override
-        public Expression visitExpression2(CruxParser.Expression2Context ctx) {
-            return null;
-        }
-
-
-
-        @Override
         public Expression visitExpression3(CruxParser.Expression3Context ctx) {
-            return null;
+            if (ctx.Not() != null) {
+                return new OpExpr(makePosition(ctx), Operation.LOGIC_NOT,
+                        expressionVisitor.visitExpression3(ctx.expression3()), null
+                        );
+            } else if (ctx.expression0() != null) {
+                return expressionVisitor.visitExpression0(ctx.expression0());
+            } else if (ctx.designator() != null) {
+                return expressionVisitor.visitDesignator(ctx.designator());
+            } else if (ctx.callExpression() != null) {
+                return expressionVisitor.visitCallExpression(ctx.callExpression());
+            } else if (ctx.literal() != null) {
+                return expressionVisitor.visitLiteral(ctx.literal());
+            } else {
+                // error??
+                return null;
+            }
         }
-
       
 
         @Override
@@ -279,9 +363,16 @@ public final class ParseTreeLower {
 
         @Override
         public Expression visitLiteral(CruxParser.LiteralContext ctx) {
-            // TODO
-            var position = makePosition(ctx);
-            return null;
+            if (ctx.Integer() != null) {
+                return new LiteralInt(makePosition(ctx), Long.parseLong(ctx.Integer().getSymbol().getText()));
+            } else if (ctx.True() != null) {
+                return new LiteralBool(makePosition(ctx), Boolean.parseBoolean(ctx.True().getSymbol().getText()));
+            } else if (ctx.False() != null) {
+                return new LiteralBool(makePosition(ctx), Boolean.parseBoolean(ctx.False().getSymbol().getText()));
+            } else {
+                // error?
+                return null;
+            }
         }
 
     }
