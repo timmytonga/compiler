@@ -122,7 +122,7 @@ public final class ParseTreeLower {
          * */
         @Override
         public ArrayDeclaration visitArrayDeclaration(CruxParser.ArrayDeclarationContext ctx) {
-            return null;
+            return new ArrayDeclaration(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText()));
         }
 
         /**
@@ -361,23 +361,19 @@ public final class ParseTreeLower {
         @Override
         public Expression visitDesignator(CruxParser.DesignatorContext ctx) {
             if (ctx.expression0().size() == 0){
-                if (dereferenceDesignator){
-                    return new Dereference(makePosition(ctx), new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText())));
-                } else {
-                    return new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText()));
-                }
+                Name result = new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText()));
+                if (dereferenceDesignator)
+                    return new Dereference(makePosition(ctx), result);
+                else
+                    return result;
             } else if (ctx.expression0().size() == 1){
-                if (dereferenceDesignator) {
-                    return new Dereference(makePosition(ctx), new ArrayAccess(
-                                makePosition(ctx),
-                                new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText())),
-                                expressionVisitor.visitExpression0(ctx.expression0(0))));
-                } else {
-                    return new ArrayAccess(
-                            makePosition(ctx),
-                            new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText())),
-                            expressionVisitor.visitExpression0(ctx.expression0(0)));
-                }
+                Name base = new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText()));
+                Expression offset = expressionVisitor.visitExpression0(ctx.expression0(0));
+                ArrayAccess result = new ArrayAccess(makePosition(ctx.expression0(0)), base, offset);
+                if (dereferenceDesignator)
+                    return new Dereference(makePosition(ctx), result);
+                else
+                    return result;
             } else {
                 // todo??
                 return null;
