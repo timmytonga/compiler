@@ -18,8 +18,12 @@ final class SymbolTable {
     SymbolTable(PrintStream err) {
         this.err = err;
         Map<String, Symbol> firstScope = new HashMap<>();
+        // this first scope will be our global scope. We initialize it with predefined functions:
+        firstScope.put("readInt", new Symbol("readInt"));
+        firstScope.put("printBool", new Symbol("printBool"));
+        firstScope.put("printInt", new Symbol("printInt"));
+        firstScope.put("println", new Symbol("println"));
         symbolScopes.add(firstScope);
-        // TODO
     }
 
     boolean hasEncounteredError() {

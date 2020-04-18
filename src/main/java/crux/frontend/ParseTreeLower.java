@@ -132,6 +132,7 @@ public final class ParseTreeLower {
             String name = ctx.Identifier().getSymbol().getText();
             Position pos = makePosition(ctx);
             Symbol symbol = symTab.add(pos, name);
+//            if (hasEncounteredError()) return null;
             return new ArrayDeclaration(pos, symbol);
         }
 
@@ -141,14 +142,21 @@ public final class ParseTreeLower {
          * */
         @Override
         public FunctionDefinition visitFunctionDefinition(CruxParser.FunctionDefinitionContext ctx) {
-            Symbol symb = new Symbol(ctx.Identifier().getSymbol().getText());
-//                    , ctx.type().Identifier().getSymbol().getText());
+            String name = ctx.Identifier().getSymbol().getText();
+            Position pos = makePosition(ctx);
+            Symbol symb = symTab.add(pos, name);
+
+            symTab.enter();
             List<Symbol> params = new ArrayList<>();
             for (CruxParser.ParameterContext param : ctx.parameterList().parameter()){
-                params.add(new Symbol(param.Identifier().getSymbol().getText()));
+                String param_name = param.Identifier().getSymbol().getText();
+                Symbol param_symb = symTab.add(makePosition(param), param_name);
+                params.add(param_symb);
             }
-            StatementList statements = lower(ctx.statementBlock());  // lower statementlist
-            return new FunctionDefinition(makePosition(ctx), symb, params, statements);
+            StatementList statements = lower(ctx.statementBlock().statementList());  // lower statementlist
+            symTab.exit();
+
+            return new FunctionDefinition(pos, symb, params, statements);
         }
     }
 
@@ -366,29 +374,33 @@ public final class ParseTreeLower {
 
         @Override
         public Call visitCallExpression(CruxParser.CallExpressionContext ctx) {
-            Symbol callee = new Symbol(ctx.Identifier().getSymbol().getText());
+            String name = ctx.Identifier().getSymbol().getText();
+            Position pos = makePosition(ctx);
+            Symbol callee = symTab.lookup(pos, name);
             List<Expression> arguments = new ArrayList<>();
             for (CruxParser.Expression0Context expression0Context : ctx.expressionList().expression0()){
                 arguments.add(expressionVisitor.visitExpression0(expression0Context));
             }
-            return new Call(makePosition(ctx), callee, arguments);
+            return new Call(pos, callee, arguments);
         }
 
 
         @Override
         public Expression visitDesignator(CruxParser.DesignatorContext ctx) {
+            String name = ctx.Identifier().getSymbol().getText();
+            Position pos = makePosition(ctx);
+            Symbol symb = symTab.lookup(pos, name);
             if (ctx.expression0().size() == 0){
-                Name result = new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText()));
+                Name result = new Name(pos, symb);
                 if (dereferenceDesignator)
-                    return new Dereference(makePosition(ctx), result);
-                else
-                    return result;
+                    return new Dereference(pos, result);
+                else return result;
             } else if (ctx.expression0().size() == 1){
-                Name base = new Name(makePosition(ctx), new Symbol(ctx.Identifier().getSymbol().getText()));
+                Name base = new Name(pos, symb);
                 Expression offset = expressionVisitor.visitExpression0(ctx.expression0(0));
                 ArrayAccess result = new ArrayAccess(makePosition(ctx.expression0(0)), base, offset);
                 if (dereferenceDesignator)
-                    return new Dereference(makePosition(ctx), result);
+                    return new Dereference(pos, result);
                 else
                     return result;
             } else {
