@@ -45,11 +45,11 @@ public final class TypeChecker {
     private final class TypeInferenceVisitor extends NullNodeVisitor {
         private Symbol currentFunctionSymbol;
         private Type currentFunctionReturnType;
-
         private boolean lastStatementReturns;
 
         @Override
         public void visit(Name name) {
+            typeMap.put(name, name.getSymbol().getType());
         }
 
         @Override
@@ -58,6 +58,7 @@ public final class TypeChecker {
 
         @Override
         public void visit(Assignment assignment) {
+
         }
 
         @Override
@@ -65,7 +66,11 @@ public final class TypeChecker {
         }
 
         @Override
-        public void visit(DeclarationList declarationList) {
+        public void visit(DeclarationList declarationList) {  // we start here
+            for (Node child :declarationList.getChildren()){
+                // how to know which visit function to call on the child
+                child.accept(this);
+            }
         }
 
         @Override
@@ -74,6 +79,20 @@ public final class TypeChecker {
 
         @Override
         public void visit(FunctionDefinition functionDefinition) {
+            // functionDefinition.getParameters();
+            Symbol funcDef = functionDefinition.getSymbol();
+            String funcName = funcDef.getName();
+            FuncType funcType = (FuncType)funcDef.getType();
+            Type returnType = funcType.getRet();
+            TypeList argTypes = funcType.getArgs();
+            if (funcName.equals("main")){
+                if ( !returnType.toString().equals("void") ||
+                !argTypes.isEmpty()) {
+                    addTypeError(functionDefinition, "Function main has invalid signature.");
+                    return;
+                }
+            }
+            functionDefinition.getStatements().accept(this);
         }
 
         @Override

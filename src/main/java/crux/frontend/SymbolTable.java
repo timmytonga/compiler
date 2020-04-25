@@ -51,8 +51,14 @@ final class SymbolTable {
     }
 
     Symbol add(Position pos, String name, Type type) {
-        // TODO
-        return null;
+        if (symbolScopes.get(symbolScopes.size()-1).containsKey(name)){
+            err.printf("DeclareSymbolError%s[%s already exists.]%n", pos, name);
+            encounteredError = true;
+            return new Symbol(name, "DeclareSymbolError");
+        }
+        Symbol sym = new Symbol(name, type);
+        symbolScopes.get(symbolScopes.size()-1).put(name, sym);
+        return sym;
     }
 
     Symbol lookup(Position pos, String name) {

@@ -8,10 +8,8 @@ import crux.frontend.types.*;
 import org.antlr.v4.runtime.ParserRuleContext;
 
 import java.io.PrintStream;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * In this class, you're going to implement functionality that transform a input ParseTree
@@ -37,6 +35,19 @@ public final class ParseTreeLower {
     private static Position makePosition(ParserRuleContext ctx) {
         var start = ctx.start;
         return new Position(start.getLine(), start.getCharPositionInLine());
+    }
+
+    private static Type makePrimitiveType(String type){
+        switch (type) {
+            case "void":
+                return new VoidType();  // this can cause problem
+            case "int":
+                return new IntType();
+            case "bool":
+                return new BoolType();
+            default:
+                return new ErrorType("I don't know what this primitive type is! Fix me");
+        }
     }
 
     /**
@@ -118,8 +129,10 @@ public final class ParseTreeLower {
         @Override
         public VariableDeclaration visitVariableDeclaration(CruxParser.VariableDeclarationContext ctx) {
             String name = ctx.Identifier().getSymbol().getText();
+            String typeName = ctx.type().Identifier().getSymbol().getText();
+            Type type = makePrimitiveType(typeName);
             Position pos = makePosition(ctx);
-            Symbol symbol = symTab.add(pos, name);
+            Symbol symbol = symTab.add(pos, name, type);
             return new VariableDeclaration(pos, symbol);
         }
 
@@ -130,8 +143,12 @@ public final class ParseTreeLower {
         @Override
         public ArrayDeclaration visitArrayDeclaration(CruxParser.ArrayDeclarationContext ctx) {
             String name = ctx.Identifier().getSymbol().getText();
+            String baseTypeName = ctx.type().Identifier().getSymbol().getText();
+            Type baseType = makePrimitiveType(baseTypeName);
+            long extent = Long.parseLong(ctx.Integer().getSymbol().getText());
+            Type type = new ArrayType(extent, baseType);
             Position pos = makePosition(ctx);
-            Symbol symbol = symTab.add(pos, name);
+            Symbol symbol = symTab.add(pos, name, type);
 //            if (hasEncounteredError()) return null;
             return new ArrayDeclaration(pos, symbol);
         }
@@ -144,13 +161,21 @@ public final class ParseTreeLower {
         public FunctionDefinition visitFunctionDefinition(CruxParser.FunctionDefinitionContext ctx) {
             String name = ctx.Identifier().getSymbol().getText();
             Position pos = makePosition(ctx);
-            Symbol symb = symTab.add(pos, name);
+            Type returnType = makePrimitiveType(ctx.type().Identifier().getSymbol().getText());
+            TypeList args = new TypeList();
+            for (CruxParser.ParameterContext param : ctx.parameterList().parameter()) {
+                args.append(makePrimitiveType(param.type().Identifier().getSymbol().getText()));
+            }
+            Type funcType = new FuncType(args, returnType);
+            Symbol symb = symTab.add(pos, name, funcType);
 
             symTab.enter();
             List<Symbol> params = new ArrayList<>();
             for (CruxParser.ParameterContext param : ctx.parameterList().parameter()){
                 String param_name = param.Identifier().getSymbol().getText();
-                Symbol param_symb = symTab.add(makePosition(param), param_name);
+                String param_typeName = param.type().Identifier().getSymbol().getText();
+                Type param_type = makePrimitiveType(param_typeName);
+                Symbol param_symb = symTab.add(makePosition(param), param_name, param_type);
                 params.add(param_symb);
             }
             StatementList statements = lower(ctx.statementBlock().statementList());  // lower statementlist
