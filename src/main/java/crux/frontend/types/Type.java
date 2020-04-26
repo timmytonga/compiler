@@ -2,34 +2,57 @@ package crux.frontend.types;
 
 public abstract class Type {
     Type add(Type that) {
+        if (this.toString().equals("int") && that.toString().equals("int")){
+            return new IntType();
+        }
         return new ErrorType("cannot add " + this + " with " + that);
     }
 
     Type sub(Type that) {
+        if (this.toString().equals("int") && that.toString().equals("int")){
+            return new IntType();
+        }
         return new ErrorType("cannot subtract " + this + " from " + that);
     }
 
     Type mul(Type that) {
+        if (this.toString().equals("int") && that.toString().equals("int")){
+            return new IntType();
+        }
         return new ErrorType("cannot multiply " + this + " with " + that);
     }
 
     Type div(Type that) {
+        if (this.toString().equals("int") && that.toString().equals("int")){
+            return new IntType();
+        }
         return new ErrorType("cannot divide " + this + " by " + that);
     }
 
     Type and(Type that) {
+        if (this.toString().equals("bool") && that.toString().equals("bool")){
+            return new BoolType();
+        }
         return new ErrorType("cannot compute " + this + " and " + that);
     }
 
     Type or(Type that) {
+        if (this.toString().equals("bool") && that.toString().equals("bool")){
+            return new BoolType();
+        }
         return new ErrorType("cannot compute " + this + " or " + that);
     }
 
     Type not() {
+        if (this.toString().equals("bool"))
+            return new BoolType();
         return new ErrorType("cannot negate " + this);
     }
 
     Type compare(Type that) {
+        if (this.toString().equals("int") && that.toString().equals("int")){
+            return new BoolType();
+        }
         return new ErrorType("cannot compare " + this + " with " + that);
     }
 

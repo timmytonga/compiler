@@ -12,13 +12,16 @@ public final class OpExpr extends BaseNode implements Expression {
     EQ("=="),
     GT(">"),
     LT("<"),
+
     ADD("+"),
     SUB("-"),
     MULT("*"),
     DIV("/"),
+
     LOGIC_AND("&&"),
     LOGIC_OR("||"),
     LOGIC_NOT("!");
+
     private String op;
     Operation(String op) {
       this.op = op;

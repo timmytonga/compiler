@@ -19,10 +19,22 @@ final class SymbolTable {
         this.err = err;
         Map<String, Symbol> firstScope = new HashMap<>();
         // this first scope will be our global scope. We initialize it with predefined functions:
-        firstScope.put("readInt", new Symbol("readInt"));
-        firstScope.put("printBool", new Symbol("printBool"));
-        firstScope.put("printInt", new Symbol("printInt"));
-        firstScope.put("println", new Symbol("println"));
+        // readInt
+        FuncType readIntFuncType = new FuncType(new TypeList(), new IntType());
+        firstScope.put("readInt", new Symbol("readInt", readIntFuncType));
+        // printBool
+        TypeList printBoolTypeList = new TypeList();
+        printBoolTypeList.append(new BoolType());
+        FuncType printBoolFuncType = new FuncType(printBoolTypeList, new VoidType());
+        firstScope.put("printBool", new Symbol("printBool", printBoolFuncType));
+        // printInt
+        TypeList printIntTypeList = new TypeList();
+        printIntTypeList.append(new IntType());
+        FuncType printIntFuncType = new FuncType(printIntTypeList, new VoidType());
+        firstScope.put("printInt", new Symbol("printInt", printIntFuncType));
+        // println
+        FuncType printlnFuncType = new FuncType(new TypeList(), new VoidType());
+        firstScope.put("println", new Symbol("println", printlnFuncType));
         symbolScopes.add(firstScope);
     }
 

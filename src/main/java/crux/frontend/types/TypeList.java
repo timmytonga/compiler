@@ -22,6 +22,8 @@ public final class TypeList extends Type implements Iterable<Type> {
         return typeList;
     }
 
+    public List<Type> getList() { return list;}
+
     public void append(Type type) {
         list.add(type);
     }
