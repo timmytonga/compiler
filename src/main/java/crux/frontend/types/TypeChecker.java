@@ -55,32 +55,34 @@ public final class TypeChecker {
 
         @Override
         public void visit(ArrayDeclaration arrayDeclaration) {
+            Type arrayType = arrayDeclaration.getSymbol().getType();
         }
 
         @Override
         public void visit(Assignment assignment) {
-
+            Node left = assignment.getLocation();
+            Node right = assignment.getValue();
+            left.accept(this);
+            right.accept(this);
+            setNodeType(assignment, getType(left).assign(getType(right).deref()));
         }
 
+        /**
+         * For a call expression we must ensure the following:
+         *  1. Set the return type according to the function return type
+         *  2. Check the arguments are deref and type match properly.
+         */
         @Override
         public void visit(Call call) {
-            FuncType function = (FuncType)call.getCallee().getType();
-            Type returnType = function.getRet();
-            setNodeType(call, returnType);
-
-            if (function.getArgs().getList().size() != call.getArguments().size()){
-                addTypeError(call, "visit(Call call) call has more arguments than expected.");
-            }
-            // check call is valid i.e. the arg of each param matches
-            for (int i = 0; i < call.getArguments().size(); i++){
-                Expression arg = call.getArguments().get(i);
+            FuncType funcionType = (FuncType)call.getCallee().getType();
+            // first we check if the call arguments are valid
+            TypeList callArgs = new TypeList();
+            for (Expression arg : call.getArguments()){
+                // checking arguments type
                 arg.accept(this);
-                Type argType = getType(arg);
-                Type expectedType = function.getArgs().getList().get(i);
-//                if (!argType.equivalent(expectedType)){
-//                    addTypeError(arg, "Wrong expected arg type");
-//                }
+                callArgs.append(getType(arg));
             }
+            setNodeType(call, funcionType.call(callArgs));
         }
 
         @Override
@@ -94,7 +96,7 @@ public final class TypeChecker {
         public void visit(Dereference dereference) {
             Node child = dereference.getAddress();
             child.accept(this);
-            setNodeType(dereference, getType(child));
+            setNodeType(dereference, getType(child).deref());
         }
 
         @Override
@@ -109,11 +111,24 @@ public final class TypeChecker {
             if (funcName.equals("main")){
                 if ( !returnType.toString().equals("void") ||
                 !argTypes.isEmpty()) {
-                    addTypeError(functionDefinition, "Function main has invalid signature.");
+                    setNodeType(functionDefinition, new ErrorType("Function main has invalid signature."));
                     return;
                 }
             }
-            setNodeType(functionDefinition, funcType);
+            // then we check for arguments for valid type (cannot be void
+            int argPos = 0;
+            for (Symbol arg : functionDefinition.getParameters()){
+                if (arg.getType().toString().equals("void")){
+                    String errorMsg = String.format("Function %s has a void argument in position %d.", funcName, argPos);
+                    setNodeType(functionDefinition, new ErrorType(errorMsg));
+                } else if (!(arg.getType().toString().equals("int") || arg.getType().toString().equals("bool"))){
+                    String errorMsg = String.format("Function %s has an error in argument in position %d: %s.",
+                            funcName, argPos, arg.getType().toString());
+                    setNodeType(functionDefinition, new ErrorType(errorMsg));
+                }
+                argPos++;
+            }
+            //setNodeType(functionDefinition, funcType);
             for (Node child: functionDefinition.getStatements().getChildren()){
                 // for each statement in the statementList in the function's body
                 // we check for them
@@ -122,12 +137,10 @@ public final class TypeChecker {
                     if (!getType(child).toString().equals(returnType.toString())){
                         String msg = String.format("Function %s returns %s not %s.",
                                 funcName, returnType.toString(), getType(child).toString());
-                        addTypeError(child, msg);
+                        setNodeType(child, new ErrorType(msg));
                     }
                 }
             }
-
-
         }
 
         @Override
@@ -136,7 +149,7 @@ public final class TypeChecker {
 
         @Override
         public void visit(ArrayAccess access) {
-            setNodeType(access, access.getBase().getSymbol().getType());
+            setNodeType(access, access.getBase().getSymbol().getType().deref());
         }
 
         @Override
@@ -196,7 +209,9 @@ public final class TypeChecker {
         public void visit(Return ret) {
             Node child = ret.getValue();
             child.accept(this);
-            setNodeType(ret, getType(child));
+            if (getType(child) instanceof ErrorType){
+                typeMap.put(ret, getType(child));
+            } else setNodeType(ret, getType(child));
         }
 
         @Override
