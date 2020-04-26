@@ -50,7 +50,7 @@ public abstract class Type {
     }
 
     Type compare(Type that) {
-        if (this.equivalent(that)){
+        if (this.toString().equals("int") && that.toString().equals("int")){
             return new BoolType();
         }
         return new ErrorType("cannot compare " + this + " with " + that);

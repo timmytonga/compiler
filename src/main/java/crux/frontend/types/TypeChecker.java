@@ -64,7 +64,7 @@ public final class TypeChecker {
             Node right = assignment.getValue();
             left.accept(this);
             right.accept(this);
-            setNodeType(assignment, getType(left).assign(getType(right).deref()));
+            setNodeType(assignment, getType(left).assign(getType(right)));
         }
 
         /**
@@ -167,7 +167,7 @@ public final class TypeChecker {
             Node leftChild = op.getLeft();
             Node rightChild = op.getRight();
             leftChild.accept(this);
-            rightChild.accept(this);
+            if (rightChild != null) rightChild.accept(this);
             // first we check if left child op right child is valid.
             // if it is, the type of the opexpr is the type of the op
             switch (op.getOp().toString()){
