@@ -145,6 +145,17 @@ public final class TypeChecker {
 
         @Override
         public void visit(IfElseBranch ifElseBranch) {
+            Node condition = ifElseBranch.getCondition();
+            condition.accept(this);  // typecheck condition
+            if (getType(condition).getClass() != BoolType.class){
+                String msg = String.format("IfElseBranch requires bool condition not %s.", getType(condition));
+                setNodeType(ifElseBranch, new ErrorType(msg));
+            }
+            // now type check body
+            StatementList thenBlock = ifElseBranch.getThenBlock();
+            StatementList elseBlock = ifElseBranch.getElseBlock();
+            thenBlock.accept(this);
+            elseBlock.accept(this);
         }
 
         @Override
@@ -216,6 +227,9 @@ public final class TypeChecker {
 
         @Override
         public void visit(StatementList statementList) {
+            for (Node child : statementList.getChildren()){
+                child.accept(this);
+            }
         }
 
         @Override
