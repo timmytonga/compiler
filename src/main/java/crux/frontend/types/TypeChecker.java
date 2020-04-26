@@ -238,6 +238,15 @@ public final class TypeChecker {
 
         @Override
         public void visit(WhileLoop whileLoop) {
+            Node condition = whileLoop.getCondition();
+            condition.accept(this);  // typecheck condition
+            if (getType(condition).getClass() != BoolType.class){
+                String msg = String.format("WhileLoop requires bool condition not %s.", getType(condition));
+                setNodeType(whileLoop, new ErrorType(msg));
+            }
+            // now type check body
+            StatementList body = whileLoop.getBody();
+            body.accept(this);
         }
     }
 }
