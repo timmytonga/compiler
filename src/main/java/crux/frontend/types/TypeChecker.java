@@ -128,10 +128,10 @@ public final class TypeChecker {
                 }
                 argPos++;
             }
-            //setNodeType(functionDefinition, funcType);
+            // Now we check for valid return path
+            boolean theresNoReturnStatement = true;
             for (Node child: functionDefinition.getStatements().getChildren()){
-                // for each statement in the statementList in the function's body
-                // we check for them
+                // for each statement in the statementList in the function's body we check for them
                 child.accept(this);
                 if (child instanceof Return){
                     if (!getType(child).toString().equals(returnType.toString())){
@@ -139,7 +139,12 @@ public final class TypeChecker {
                                 funcName, returnType.toString(), getType(child).toString());
                         setNodeType(child, new ErrorType(msg));
                     }
+                    theresNoReturnStatement = false;
                 }
+            }
+            if (theresNoReturnStatement && !returnType.toString().equals("void")){
+                String msg = String.format("Not all code paths in function %s return a value.", funcName);
+                setNodeType(functionDefinition, new ErrorType(msg));
             }
         }
 
