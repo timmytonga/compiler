@@ -65,9 +65,10 @@ public abstract class Type {
             if  (((AddressType) this).getBaseType().getClass() == BoolType.class)
                 return new BoolType();
             if (((AddressType) this).getBaseType().getClass() == ArrayType.class)
-                return ((ArrayType)((AddressType) this).getBaseType()).getBase();
+                return ((AddressType) this).getBaseType();
             return new ErrorType("cannot deref " + this);
-        } else if (this.getClass() == ArrayType.class){
+        }
+        else if (this.getClass() == ArrayType.class){
             if (((ArrayType) this).getBase().getClass() == IntType.class)
                 return new IntType();
             if  (((ArrayType) this).getBase().getClass() == BoolType.class)
@@ -78,6 +79,15 @@ public abstract class Type {
     }
 
     Type index(Type that) {
+        if (this.getClass() == AddressType.class){
+            AddressType base = ((AddressType)this);
+            if (base.getBaseType().getClass() == ArrayType.class && that.getClass() == IntType.class){
+                return base.getBaseType();
+            }
+        }
+
+        if (this.getClass() == ArrayType.class && that.getClass() == IntType.class)
+            return ((ArrayType) this).getBase().deref();
         return new ErrorType("cannot index " + this + " with " + that);
     }
 

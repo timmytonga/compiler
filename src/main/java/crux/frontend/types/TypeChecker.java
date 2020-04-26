@@ -64,7 +64,9 @@ public final class TypeChecker {
             Node right = assignment.getValue();
             left.accept(this);
             right.accept(this);
-            setNodeType(assignment, getType(left).assign(getType(right)));
+            Type rightType = getType(right);
+            Type leftType = getType(left);
+            setNodeType(assignment, leftType.assign(rightType));
         }
 
         /**
@@ -165,7 +167,14 @@ public final class TypeChecker {
 
         @Override
         public void visit(ArrayAccess access) {
-            setNodeType(access, access.getBase().getSymbol().getType().deref());
+            if (access.getOffset() == null){
+                setNodeType(access, access.getBase().getSymbol().getType());
+            } else {
+                Node offSet = access.getOffset();
+                offSet.accept(this);
+                setNodeType(access, access.getBase().getSymbol().getType().index(getType(offSet)));
+            }
+
         }
 
         @Override
@@ -239,6 +248,7 @@ public final class TypeChecker {
 
         @Override
         public void visit(VariableDeclaration variableDeclaration) {
+            setNodeType(variableDeclaration, variableDeclaration.getSymbol().getType());
         }
 
         @Override
