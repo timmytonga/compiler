@@ -55,7 +55,14 @@ public final class TypeChecker {
 
         @Override
         public void visit(ArrayDeclaration arrayDeclaration) {
-            Type arrayType = arrayDeclaration.getSymbol().getType();
+            ArrayType arrayType = (ArrayType)arrayDeclaration.getSymbol().getType();
+            Type baseType = arrayType.getBase();
+            if (baseType.getClass() == VoidType.class) {
+                String arrayName = arrayDeclaration.getSymbol().getName();
+                String msg = String.format("Array %s has invalid base type %s.", arrayName, baseType.toString());
+                setNodeType(arrayDeclaration, new ErrorType(msg));
+            } else
+                setNodeType(arrayDeclaration, arrayType);
         }
 
         @Override
@@ -248,7 +255,11 @@ public final class TypeChecker {
 
         @Override
         public void visit(VariableDeclaration variableDeclaration) {
-            setNodeType(variableDeclaration, variableDeclaration.getSymbol().getType());
+            if (variableDeclaration.getSymbol().getType().getClass() == VoidType.class){
+                String msg = String.format("Variable %s has invalid type void.", variableDeclaration.getSymbol().getName());
+                setNodeType(variableDeclaration, new ErrorType(msg));
+            } else
+                setNodeType(variableDeclaration, variableDeclaration.getSymbol().getType());
         }
 
         @Override
