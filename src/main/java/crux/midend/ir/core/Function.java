@@ -86,7 +86,7 @@ public final class Function implements Formattable {
         Stack<Instruction> tovisit = new Stack<>();
 
         tovisit.add(start);
-        nodeIdMap.put(start, "N"+(nodeCounter++));
+        nodeIdMap.put(start, nodePrefix+(nodeCounter++));
 
         while(!tovisit.isEmpty()) {
             Instruction inst = tovisit.pop();
@@ -101,7 +101,7 @@ public final class Function implements Formattable {
             for(int i = 0; i < inst.numNext(); i++) {
                 Instruction dst = inst.getNext(i);
                 if (!nodeIdMap.containsKey(dst)) {
-                    nodeIdMap.put(dst, "N"+(nodeCounter++));
+                    nodeIdMap.put(dst, nodePrefix+(nodeCounter++));
                     tovisit.push(dst);
                 }
                 String dstId = nodeIdMap.get(dst);

@@ -13,6 +13,7 @@ import java.util.stream.Stream;
 public final class TypeChecker {
     private final HashMap<Node, Type> typeMap = new HashMap<>();
     private final ArrayList<String> errors = new ArrayList<>();
+    private final HashMap<Node, Boolean> checkReturnMap = new HashMap<>();
 
     public ArrayList<String> getErrors() {
         return errors;
@@ -35,6 +36,13 @@ public final class TypeChecker {
         }
     }
 
+    private void setNodeReturn(Node n, Boolean containsReturn){
+        checkReturnMap.put(n, containsReturn);
+    }
+
+    private boolean getNodeHasReturn(Node n){
+        return checkReturnMap.get(n);
+    }
     /** 
       *  Returns type of given AST Node.
       */
@@ -141,14 +149,19 @@ public final class TypeChecker {
             boolean theresNoReturnStatement = true;
             for (Node child: functionDefinition.getStatements().getChildren()){
                 // for each statement in the statementList in the function's body we check for them
-                child.accept(this);
                 if (child instanceof Return){
+                    child.accept(this);
                     if (!getType(child).toString().equals(returnType.toString())){
                         String msg = String.format("Function %s returns %s not %s.",
                                 funcName, returnType.toString(), getType(child).toString());
                         setNodeType(child, new ErrorType(msg));
                     }
                     theresNoReturnStatement = false;
+                } else if (child instanceof IfElseBranch){
+                    child.accept(this);
+
+                } else{
+                    child.accept(this);
                 }
             }
             if (theresNoReturnStatement && !returnType.toString().equals("void")){
