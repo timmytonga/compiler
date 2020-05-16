@@ -214,12 +214,9 @@ public final class ASTLower implements NodeVisitor {
             mCurrentExpression = dstVar;
             return;
         }  // else it's the other binary operator
-        // then we process the RHS
-        operation.getRight().accept(this);
-        LocalVar rhs = (LocalVar) mCurrentExpression;
-        // then we combine them together
         CompareInst.Predicate compPredicate = null;
         BinaryOperator.Op  binaryOp = null;
+        String boolOp = null;
         switch (operation.getOp().toString()) {
             case (">="):
                 compPredicate = CompareInst.Predicate.GE;
@@ -251,8 +248,67 @@ public final class ASTLower implements NodeVisitor {
             case ("/"):
                 binaryOp = BinaryOperator.Op.Div;
                 break;
-            default:  //  ??
+            case ("&&"):
+                boolOp = "&&";
+                break;
+            case ("||"):
+                boolOp = "||";
+                break;
+            default:
+                break;  // should not be here???
         }
+
+        if (boolOp != null) {  // if we are handling "and" or "or"
+            // first we make a result variable
+            LocalVar dstVar = mCurrentFunction.getTempVar(new BoolType());
+            // we make the assignment to dstVar depending on the value of lhs
+            JumpInst jumpInst = new JumpInst(lhs);
+            add_adge(mLastControlInstruction, jumpInst);
+            mLastControlInstruction = jumpInst;
+            NopInst mergeInst = new NopInst();
+            NopInst thenBranch = new NopInst();
+            if (boolOp.equals("&&")){
+                // if (lhs) {dstvar = rhs} else {dstvar = lhs};
+                // we first handle the else block: setting dstvar = lhs;
+                CopyInst copyInst = new CopyInst(dstVar, lhs);
+                add_adge(jumpInst, copyInst);
+                add_adge(copyInst, mergeInst);
+                // now we handle the then block in which we branch away
+                jumpInst.setNext(1, thenBranch);
+                mLastControlInstruction = thenBranch;
+                // then we process the RHS
+                operation.getRight().accept(this);  // this should set the mCurrentExpression
+                LocalVar rhs = (LocalVar)mCurrentExpression;
+                CopyInst copyInst1 = new CopyInst(dstVar, rhs);
+                add_adge(mLastControlInstruction, copyInst1);
+                mLastControlInstruction = copyInst1;
+            } else {  // boolOp == "||"
+                // if (lhs) {dstvar = lhs} else {dstvar = rhs}
+                // first handle the else block: dstvar = rhs
+                operation.getRight().accept(this);  // this should set the mCurrentExpression
+                LocalVar rhs = (LocalVar)mCurrentExpression;
+                CopyInst copyInst = new CopyInst(dstVar, rhs);
+                add_adge(mLastControlInstruction, copyInst);
+                add_adge(copyInst, mergeInst);
+                // now we handle the then block in which we branch away
+                jumpInst.setNext(1, thenBranch);
+                // in the then block we set dstvar = lhs
+                CopyInst copyInst1 = new CopyInst(dstVar, lhs);
+                add_adge(thenBranch, copyInst1);
+                mLastControlInstruction = copyInst1;
+            }
+            // finally add the block to the merge inst
+            add_adge(mLastControlInstruction, mergeInst);
+            mLastControlInstruction = mergeInst;
+            mCurrentExpression = dstVar;
+            return;
+        }
+
+        // then we process the RHS
+        operation.getRight().accept(this);
+        LocalVar rhs = (LocalVar) mCurrentExpression;
+        // then we combine them together
+
         if (compPredicate != null){  // we need to make a comp inst
             LocalVar dstVar = mCurrentFunction.getTempVar(new BoolType());
             CompareInst compareInst = new CompareInst(dstVar, compPredicate, lhs, rhs);
@@ -363,5 +419,24 @@ public final class ASTLower implements NodeVisitor {
 
     @Override
     public void visit(WhileLoop whileLoop) {
+        // we need a point to jump back after we are done
+        NopInst startWhile = new NopInst();
+        add_adge(mLastControlInstruction, startWhile);
+        mLastControlInstruction = startWhile;
+        // first process the condition
+        whileLoop.getCondition().accept(this);
+        // then we jump to finish or the body
+        JumpInst jumpInst = new JumpInst((LocalVar)mCurrentExpression);
+        add_adge(mLastControlInstruction, jumpInst);
+        NopInst whileBody = new NopInst();
+        jumpInst.setNext(1, whileBody);  // if condition holds we go to whileBody
+        mLastControlInstruction = whileBody;
+        // which is constructed with the statements below
+        whileLoop.getBody().accept(this);
+        add_adge(mLastControlInstruction, startWhile); // after executing the while loop, we go back and check the condition:
+        // now we take care of the else statement
+        NopInst exitWhile = new NopInst();
+        add_adge(jumpInst, exitWhile);
+        mLastControlInstruction = exitWhile;
     }
 }
