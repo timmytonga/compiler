@@ -93,7 +93,9 @@ public final class ASTLower implements NodeVisitor {
         // need to setup the args
         List<LocalVar> args = new ArrayList<>();
         for (Symbol arg : functionDefinition.getParameters()){
-            args.add(new LocalVar(arg.getType(), arg.getName()));
+            LocalVar localVar = new LocalVar(arg.getType(), arg.getName());
+            args.add(localVar);
+            mCurrentLocalVarMap.put(arg, localVar);
         }
         // need to set mCurrentFunction to the function...
         mCurrentFunction = new Function(funcName, args, funcType);
@@ -101,7 +103,7 @@ public final class ASTLower implements NodeVisitor {
         // this will set currentfunction's start instruction....
         functionDefinition.getStatements().accept(this);
         mCurrentProgram.addFunction(mCurrentFunction);  // finally we add the function to the program
-
+        mCurrentGlobalSymMap.put(funcDef, new AddressVar(funcType, funcName));
     }
 
     @Override
@@ -132,16 +134,22 @@ public final class ASTLower implements NodeVisitor {
   
     @Override
     public void visit(ArrayDeclaration arrayDeclaration) {
+        // only in global scope
+        ArrayType arrayType = (ArrayType)arrayDeclaration.getSymbol().getType();
+        String arrayName = arrayDeclaration.getSymbol().getName();
+        var addrVar = new AddressVar(arrayType, arrayName);
+        mCurrentGlobalSymMap.put(arrayDeclaration.getSymbol(), addrVar);
+        mCurrentProgram.addGlobalVar(new GlobalDecl(addrVar, IntegerConstant.get(mCurrentProgram, arrayType.getExtent())));
     }
 
     @Override
     public void visit(Name name) {
         Symbol sym = name.getSymbol();
-        AddressVar dstVar =  mCurrentFunction.getTempAddressVar(sym.getType());
 
         if (mCurrentLocalVarMap.get(sym) != null){  // we first look inside local scope
-           Variable localVar = mCurrentLocalVarMap.get(sym);  // this can be local or addressvar
+            mCurrentExpression = mCurrentLocalVarMap.get(sym);  // this can be local or addressvar
         } else if (mCurrentGlobalSymMap.get(sym) != null){
+            AddressVar dstVar =  mCurrentFunction.getTempAddressVar(sym.getType());
             AddressAt addrAtInst = new AddressAt(dstVar, mCurrentGlobalSymMap.get(sym));
             add_adge(mLastControlInstruction, addrAtInst);
             mLastControlInstruction = addrAtInst;
@@ -195,30 +203,103 @@ public final class ASTLower implements NodeVisitor {
 
     @Override
     public void visit(OpExpr operation) {
+        // first we process the LHS
+        operation.getLeft().accept(this);
+        LocalVar lhs = (LocalVar) mCurrentExpression;
+        if (operation.getRight() == null){  // this is a UnaryNot operator
+            LocalVar dstVar = mCurrentFunction.getTempVar(new BoolType());
+            UnaryNotInst unaryNotInst = new UnaryNotInst(dstVar, lhs);
+            add_adge(mLastControlInstruction, unaryNotInst);
+            mLastControlInstruction = unaryNotInst;
+            mCurrentExpression = dstVar;
+            return;
+        }  // else it's the other binary operator
+        // then we process the RHS
+        operation.getRight().accept(this);
+        LocalVar rhs = (LocalVar) mCurrentExpression;
+        // then we combine them together
+        CompareInst.Predicate compPredicate = null;
+        BinaryOperator.Op  binaryOp = null;
+        switch (operation.getOp().toString()) {
+            case (">="):
+                compPredicate = CompareInst.Predicate.GE;
+                break;
+            case ("<="):
+                compPredicate = CompareInst.Predicate.LE;
+                break;
+            case ("!="):
+                compPredicate = CompareInst.Predicate.NE;
+                break;
+            case ("=="):
+                compPredicate = CompareInst.Predicate.EQ;
+                break;
+            case (">"):
+                compPredicate = CompareInst.Predicate.GT;
+                break;
+            case ("<"):
+                compPredicate = CompareInst.Predicate.LT;
+                break;
+            case ("+"):
+                binaryOp = BinaryOperator.Op.Add;
+                break;
+            case ("-"):
+                binaryOp = BinaryOperator.Op.Sub;
+                break;
+            case ("*"):
+                binaryOp = BinaryOperator.Op.Mul;
+                break;
+            case ("/"):
+                binaryOp = BinaryOperator.Op.Div;
+                break;
+            default:  //  ??
+        }
+        if (compPredicate != null){  // we need to make a comp inst
+            LocalVar dstVar = mCurrentFunction.getTempVar(new BoolType());
+            CompareInst compareInst = new CompareInst(dstVar, compPredicate, lhs, rhs);
+            add_adge(mLastControlInstruction, compareInst);
+            mLastControlInstruction = compareInst;
+            mCurrentExpression = dstVar;
+        } else if (binaryOp != null){  // we need to make a binary op inst
+            LocalVar dstVar = mCurrentFunction.getTempVar(new IntType());
+            BinaryOperator opInst = new BinaryOperator(binaryOp, dstVar, lhs, rhs);
+            add_adge(mLastControlInstruction, opInst);
+            mLastControlInstruction = opInst;
+            mCurrentExpression = dstVar;
+        } // else what???
+
     }
 
     @Override
     public void visit(Dereference dereference) {
         dereference.getAddress().accept(this);
-        AddressVar srcAddr = (AddressVar)mCurrentExpression;
-        LocalVar dstVar = mCurrentFunction.getTempVar(srcAddr.getType());
-        LoadInst loadInst = new LoadInst(dstVar, srcAddr);
-        add_adge(mLastControlInstruction, loadInst);
-        mLastControlInstruction = loadInst;
-        mCurrentExpression = dstVar;
-//
-//        AddressVar destVar = ;
-//        AddressVar base = ;
-//        new AddressAt(destVar, base);
+        if (mCurrentExpression instanceof  AddressVar) {  // must be a global var
+            AddressVar srcAddr = (AddressVar)mCurrentExpression;
+            LocalVar dstVar = mCurrentFunction.getTempVar(srcAddr.getType());
+            LoadInst loadInst = new LoadInst(dstVar, srcAddr);
+            add_adge(mLastControlInstruction, loadInst);
+            mLastControlInstruction = loadInst;
+            mCurrentExpression = dstVar;
+        }  // else??? what if it's a local var
+
     }
 
-    private void visit(Expression expression) {
+    private void visit(Expression expression) {  // this seems useless.... circular
         expression.accept(this);
     }
 
     @Override
     public void visit(ArrayAccess access) {
+        Symbol sym = access.getBase().getSymbol();
+        ArrayType arrayType = (ArrayType)sym.getType();
+        Variable dstVar =  mCurrentFunction.getTempAddressVar(arrayType.getBase());
+        access.getOffset().accept(this);
+        LocalVar offset = (LocalVar) mCurrentExpression;
+        AddressAt addrAtInst = new AddressAt(dstVar, mCurrentGlobalSymMap.get(sym), offset);
+        add_adge(mLastControlInstruction, addrAtInst);
+        mLastControlInstruction = addrAtInst;
+        mCurrentExpression = dstVar;
     }
+
 
     @Override
     public void visit(LiteralBool literalBool) {
@@ -242,6 +323,13 @@ public final class ASTLower implements NodeVisitor {
 
     @Override
     public void visit(Return ret) {
+        // first we evaluate the expression
+        ret.getValue().accept(this);
+        if (mCurrentExpression instanceof LocalVar){
+            ReturnInst returnInst = new ReturnInst((LocalVar)mCurrentExpression); // this should be the return value....
+            add_adge(mLastControlInstruction, returnInst);
+            mLastControlInstruction = returnInst;
+        }
     }
 
     /**
@@ -249,6 +337,28 @@ public final class ASTLower implements NodeVisitor {
      * */
     @Override
     public void visit(IfElseBranch ifElseBranch) {
+        // first we process the condition...
+        ifElseBranch.getCondition().accept(this);
+        // then we get an mExpressionValue that should be a LiteralBool
+        JumpInst jumpInst = new JumpInst((LocalVar)mCurrentExpression);
+        add_adge(mLastControlInstruction, jumpInst);
+        mLastControlInstruction = jumpInst;
+        NopInst mergeInst = new NopInst();
+        NopInst thenBranch = new NopInst();
+        // we first handle the else block
+        if (ifElseBranch.getElseBlock() != null){
+            ifElseBranch.getElseBlock().accept(this);
+        }  // if it's null then we do nothing
+        // the basic block of the else will point to the mergeInst
+        add_adge(mLastControlInstruction, mergeInst);
+        // now we handle the then block in which we branch away
+        jumpInst.setNext(1, thenBranch);
+        mLastControlInstruction = thenBranch;
+        // then we build a basic block from there
+        ifElseBranch.getThenBlock().accept(this);
+        // finally add the block to the merge inst
+        add_adge(mLastControlInstruction, mergeInst);
+        mLastControlInstruction = mergeInst;  // continue from the merge point
     }
 
     @Override
