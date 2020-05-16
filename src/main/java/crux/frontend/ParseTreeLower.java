@@ -415,15 +415,15 @@ public final class ParseTreeLower {
             String name = ctx.Identifier().getSymbol().getText();
             Position pos = makePosition(ctx);
             Symbol symb = symTab.lookup(pos, name);
-            AddressType newType = new AddressType(symb.getType());
-            Symbol newSymb = new Symbol(symb.getName(), newType);
+//            AddressType newType = new AddressType(symb.getType());
+//            Symbol newSymb = new Symbol(symb.getName(), newType);
             if (ctx.expression0().size() == 0){
-                Name result = new Name(pos, newSymb);
+                Name result = new Name(pos, symb);
                 if (dereferenceDesignator)
                     return new Dereference(pos, result);
                 else return result;
             } else if (ctx.expression0().size() == 1){
-                Name base = new Name(pos, newSymb);
+                Name base = new Name(pos, symb);
                 Expression offset = expressionVisitor.visitExpression0(ctx.expression0(0));
                 ArrayAccess result = new ArrayAccess(makePosition(ctx.expression0(0)), base, offset);
                 if (dereferenceDesignator)

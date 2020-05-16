@@ -50,7 +50,6 @@ public final class ASTLower implements NodeVisitor {
      * The top level Program
      * */
     private void initBuiltInFunctions() {
-        // TODO: Add built-in function symbols
         FuncType readIntFuncType = new FuncType(new TypeList(), new IntType());
 
         TypeList printBoolTypeList = new TypeList();
@@ -75,18 +74,11 @@ public final class ASTLower implements NodeVisitor {
     public void visit(DeclarationList declarationList) {
         mCurrentProgram = new Program();
         mCurrentGlobalSymMap = new HashMap<>();
+        mCurrentLocalVarMap = new HashMap<>();
         // need to make a new mCurrentFunction, and mCurrentProgram to get everything started
         for (Node child : declarationList.getChildren()){
+            mCurrentFunction = null;  // reset scope
             child.accept(this);  // so this can be a global var declaration or a function
-            if (child instanceof VariableDeclaration){
-                Symbol childSym = ((VariableDeclaration) child).getSymbol();
-                // todo: p.addGlobalVar(new GlobalDecl(mCurrentGlobalSymMap.get(childSym), ));
-            } else if (child instanceof ArrayDeclaration){
-
-            } else if (child instanceof FunctionDefinition){
-                mCurrentProgram.addFunction(mCurrentFunction);
-            }
-            // do we need to do anything else here?
         }
     }
 
@@ -108,6 +100,7 @@ public final class ASTLower implements NodeVisitor {
         mLastControlInstruction = null;  // we reset this since we are defining a new scope
         // this will set currentfunction's start instruction....
         functionDefinition.getStatements().accept(this);
+        mCurrentProgram.addFunction(mCurrentFunction);  // finally we add the function to the program
 
     }
 
@@ -123,6 +116,18 @@ public final class ASTLower implements NodeVisitor {
      * */
     @Override
     public void visit(VariableDeclaration variableDeclaration) {
+        String varName = variableDeclaration.getSymbol().getName();
+        Type varType = variableDeclaration.getSymbol().getType();
+        if(mCurrentFunction == null) {  // i.e. we are in the global scope
+            // in global scope we must construct an AddressVar
+            var addrVar = new AddressVar(varType, varName);
+            mCurrentGlobalSymMap.put(variableDeclaration.getSymbol(), addrVar);
+            // len is 0 because not an array
+            IntegerConstant len = IntegerConstant.get(mCurrentProgram, 1);
+            mCurrentProgram.addGlobalVar(new GlobalDecl(addrVar, len));
+        } else {  // we are in a function scope
+            // todo
+        }
     }
   
     @Override
@@ -131,10 +136,33 @@ public final class ASTLower implements NodeVisitor {
 
     @Override
     public void visit(Name name) {
+        Symbol sym = name.getSymbol();
+        AddressVar dstVar =  mCurrentFunction.getTempAddressVar(sym.getType());
+
+        if (mCurrentLocalVarMap.get(sym) != null){  // we first look inside local scope
+           Variable localVar = mCurrentLocalVarMap.get(sym);  // this can be local or addressvar
+        } else if (mCurrentGlobalSymMap.get(sym) != null){
+            AddressAt addrAtInst = new AddressAt(dstVar, mCurrentGlobalSymMap.get(sym));
+            add_adge(mLastControlInstruction, addrAtInst);
+            mLastControlInstruction = addrAtInst;
+            mCurrentExpression = dstVar;
+        }
     }
 
     @Override
     public void visit(Assignment assignment) {
+        Expression lhs = assignment.getLocation();
+        Expression rhs = assignment.getValue();
+
+        rhs.accept(this);  // so this will set some value to CurrentExpression
+        LocalVar srcVal = (LocalVar) mCurrentExpression;
+        lhs.accept(this);  // this wil get the address
+        AddressVar destAddr = (AddressVar) mCurrentExpression;
+
+        StoreInst storeInst  = new StoreInst(srcVal, destAddr);
+        add_adge(mLastControlInstruction, storeInst);
+        mLastControlInstruction = storeInst;
+
     }
 
     @Override
@@ -151,7 +179,16 @@ public final class ASTLower implements NodeVisitor {
             // the other it will visit Dereference....
             params.add((LocalVar) mCurrentExpression);
         }
-        var callInst = new CallInst(calleeAddress, params);
+        // now we make callInst
+        CallInst callInst;
+        FuncType funcType = (FuncType)call.getCallee().getType();
+        if (funcType.getRet() instanceof VoidType){  // there's no return type
+            callInst = new CallInst(calleeAddress, params);
+        } else {
+            LocalVar dstVar = mCurrentFunction.getTempVar(funcType.getRet());
+            callInst = new CallInst(dstVar, calleeAddress, params);
+            mCurrentExpression = dstVar;
+        }
         add_adge(mLastControlInstruction, callInst);
         mLastControlInstruction = callInst;
     }
@@ -162,6 +199,17 @@ public final class ASTLower implements NodeVisitor {
 
     @Override
     public void visit(Dereference dereference) {
+        dereference.getAddress().accept(this);
+        AddressVar srcAddr = (AddressVar)mCurrentExpression;
+        LocalVar dstVar = mCurrentFunction.getTempVar(srcAddr.getType());
+        LoadInst loadInst = new LoadInst(dstVar, srcAddr);
+        add_adge(mLastControlInstruction, loadInst);
+        mLastControlInstruction = loadInst;
+        mCurrentExpression = dstVar;
+//
+//        AddressVar destVar = ;
+//        AddressVar base = ;
+//        new AddressAt(destVar, base);
     }
 
     private void visit(Expression expression) {
