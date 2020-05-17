@@ -99,11 +99,11 @@ public final class ASTLower implements NodeVisitor {
         }
         // need to set mCurrentFunction to the function...
         mCurrentFunction = new Function(funcName, args, funcType);
+        mCurrentGlobalSymMap.put(funcDef, new AddressVar(funcType, funcName));
         mLastControlInstruction = null;  // we reset this since we are defining a new scope
         // this will set currentfunction's start instruction....
         functionDefinition.getStatements().accept(this);
         mCurrentProgram.addFunction(mCurrentFunction);  // finally we add the function to the program
-        mCurrentGlobalSymMap.put(funcDef, new AddressVar(funcType, funcName));
     }
 
     @Override
@@ -128,7 +128,8 @@ public final class ASTLower implements NodeVisitor {
             IntegerConstant len = IntegerConstant.get(mCurrentProgram, 1);
             mCurrentProgram.addGlobalVar(new GlobalDecl(addrVar, len));
         } else {  // we are in a function scope
-            // todo
+            LocalVar localVar = new LocalVar(varType, varName);
+            mCurrentLocalVarMap.put(variableDeclaration.getSymbol(), localVar);
         }
     }
   
@@ -165,11 +166,17 @@ public final class ASTLower implements NodeVisitor {
         rhs.accept(this);  // so this will set some value to CurrentExpression
         LocalVar srcVal = (LocalVar) mCurrentExpression;
         lhs.accept(this);  // this wil get the address
-        AddressVar destAddr = (AddressVar) mCurrentExpression;
-
-        StoreInst storeInst  = new StoreInst(srcVal, destAddr);
-        add_adge(mLastControlInstruction, storeInst);
-        mLastControlInstruction = storeInst;
+        if (mCurrentExpression instanceof AddressVar){
+            AddressVar destAddr = (AddressVar) mCurrentExpression;
+            StoreInst storeInst  = new StoreInst(srcVal, destAddr);
+            add_adge(mLastControlInstruction, storeInst);
+            mLastControlInstruction = storeInst;
+        } else {
+            LocalVar dstVar = (LocalVar) mCurrentExpression;
+            CopyInst copyInst = new CopyInst(dstVar, srcVal);
+            add_adge(mLastControlInstruction, copyInst);
+            mLastControlInstruction = copyInst;
+        }
 
     }
 
