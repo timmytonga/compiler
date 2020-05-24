@@ -26,7 +26,7 @@ public final class CodeGen extends InstVisitor {
     public void genCode() {
         for (Iterator<GlobalDecl> it = p.getGlobals(); it.hasNext(); ) {
             GlobalDecl globalDecl = it.next();
-            out.printCode(".comm " + globalDecl.toString() + ", " + globalDecl.getNumElement().toString() + ", 8");
+            out.printCode(".comm " + globalDecl.getAllocatedAddress().getName().substring(1) + ", " + ((IntegerConstant)globalDecl.getNumElement()).getValue() + ", 8");
         }
 
         for (Iterator<Function> it = p.getFunctions(); it.hasNext();){
@@ -130,7 +130,7 @@ public final class CodeGen extends InstVisitor {
                 out.bufferCode("jmp " + curr_label_map.get(first));
             } else {
                 // we return 0 for main
-                if (f.toString().equals("main")){
+                if (f.getName().equals("main")){
                     out.bufferCode("movq $0, %rax");
                 }
                 // process end of function
@@ -172,6 +172,25 @@ public final class CodeGen extends InstVisitor {
     }
 
     public void visit(AddressAt i) {
+        out.bufferCode("/* AddressAt */");
+        AddressVar dstVar = i.getDst();
+        int dstVarPos = getLocalVarStackPos(dstVar.getName())*(-8);
+        AddressVar srcVar = i.getBase();
+        LocalVar offSet = i.getOffset();
+        if (offSet == null){  // not an array
+            out.bufferCode("# no offset ");
+            out.bufferCode("movq " + srcVar.getName().substring(1) + "@GOTPCREL(%rip), %r11");
+            out.bufferCode("movq %r11, " + dstVarPos + "(%rbp)");
+        } else{
+            out.bufferCode("# there is offset... first load it");
+            int offSetPos = getLocalVarStackPos(offSet.getName())*(-8);
+            out.bufferCode("movq " + offSetPos + "(%rbp), %r11");
+            out.bufferCode("movq $8, %r10");
+            out.bufferCode("imul %r10, %r11");
+            out.bufferCode("movq " + srcVar.getName().substring(1) + "@GOTPCREL(%rip), %r10");
+            out.bufferCode("addq %r10, %r11");
+            out.bufferCode("movq %r11, " + dstVarPos + "(%rbp)");
+        }
     }
 
     public void visit(BinaryOperator i) {
@@ -188,20 +207,18 @@ public final class CodeGen extends InstVisitor {
         Value srcVal = i.getSrcValue();
         String srcStr = "error in copyInst (this should've been initialized)";
         if (srcVal instanceof BooleanConstant){
-            if (srcVal.toString().equals("true")){
-                srcStr = "$1";
-            } else {
-                srcStr = "$0";
-            }
+            if (((BooleanConstant) srcVal).getValue()){ srcStr = "$1"; }
+            else { srcStr = "$0"; }
         } else if (srcVal instanceof IntegerConstant){
-            srcStr = "$" + srcVal.toString();
+            srcStr = "$" + ((IntegerConstant) srcVal).getValue();
         } else if (srcVal instanceof LocalVar){
             srcStr = (getLocalVarStackPos(((LocalVar) srcVal).getName())*(-8))+ "(%rbp)";
         } else if (srcVal instanceof AddressVar){
-            // todo: handle global var
-        } else {
-            // ??
+            srcStr = ((AddressVar) srcVal).getName().substring(1) + "@GOTPCREL(%rip)";
         }
+//        else {
+//            // ??
+//        }
         out.bufferCode("movq " + srcStr + ", " + dstVarStackPos + "(%rbp)");
     }
 
@@ -209,22 +226,42 @@ public final class CodeGen extends InstVisitor {
     }
 
     public void visit(LoadInst i) {
+        out.bufferCode("/* LoadInst */");
+        LocalVar dstVar = i.getDst();
+        int dstVarStackPos = getLocalVarStackPos(dstVar.getName())*(-8);
+        AddressVar srcAddressVar = i.getSrcAddress();
+        int srcAddrVarStackPos = getLocalVarStackPos(srcAddressVar.getName())*(-8);
+        out.bufferCode("movq " + srcAddrVarStackPos + "(%rbp), %r10");
+        out.bufferCode("movq (%r10), %r11");
+        out.bufferCode("movq %r11, " + dstVarStackPos + "(%rbp)");
     }
 
     public void visit(NopInst i) {
+        out.bufferCode("/* NopInst */");
     }
 
     public void visit(StoreInst i) {
+        out.bufferCode("/* StoreInst */");
+        LocalVar srcVal = i.getSrcValue();
+        int srcValStackPos = getLocalVarStackPos(srcVal.getName())*(-8);
+        AddressVar dstAddr = i.getDestAddress();
+        int dstAddrStackPos = getLocalVarStackPos(dstAddr.getName())*(-8);
+        out.bufferCode("movq " + dstAddrStackPos + "(%rbp), %r10");
+        out.bufferCode("movq " + srcValStackPos + "(%rbp), %r11");
+        out.bufferCode("movq %r11, (%r10)");
     }
 
     public void visit(ReturnInst i) {
+        out.bufferCode("/* ReturnInst */");
+
     }
 
     private int getOverflowParamPos(){
         return (numLocalVar++)*(-8);  // does this affect my localVarStack??
     }
     public void visit(CallInst i) {
-        String funcName = i.getCallee().toString();
+        out.bufferCode("/* CallInst */");
+        String funcName = i.getCallee().getName().substring(1);
         List<Value> paramList = i.getParams();
         // gotta load the params into the appropriate registers first before calling
         int paramIndex = 0;
