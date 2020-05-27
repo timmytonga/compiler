@@ -251,7 +251,7 @@ public final class CodeGen extends InstVisitor {
         out.bufferCode("movq " + leftOperandStackPos + "(%rbp), %r10");
         int rightOperandStackPos = getLocalVarStackPos(i.getRightOperand().getName())*(-8);
         out.bufferCode("movq " + rightOperandStackPos + "(%rbp), %r11");
-        out.bufferCode("cmp %r10, %r11");  // compare left with right
+        out.bufferCode("cmp %r11, %r10");  // compare left with right
         out.bufferCode("movq $0, %r11");
         out.bufferCode("movq $1, %r10");
         out.bufferCode("cmov" + predicate + " %r10, %r11");
