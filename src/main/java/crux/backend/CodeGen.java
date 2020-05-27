@@ -214,7 +214,7 @@ public final class CodeGen extends InstVisitor {
         // similarly for right operand to %r11
         LocalVar rightOperand = i.getRightOperand();
         int rightOperandStackPos = getLocalVarStackPos(rightOperand.getName())*(-8);
-        out.bufferCode("movq "+ leftOperandStackPos + "(%rbp), %r11");
+        out.bufferCode("movq "+ rightOperandStackPos + "(%rbp), %r11");
         // then we perform the operation with %r10 as destination (for subtraction)
         out.bufferCode(opStr + " %r11, %r10");
         // then store the result to the dstVar stack position
