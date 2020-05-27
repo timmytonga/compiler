@@ -227,23 +227,36 @@ public final class CodeGen extends InstVisitor {
         String predicate;
         switch (i.getPredicate()){
             case GE:
-                predicate = "";
+                predicate = "ge";
                 break;
             case GT:
+                predicate = "g";
                 break;
             case LE:
+                predicate = "le";
                 break;
             case LT:
+                predicate = "l";
                 break;
             case EQ:
+                predicate = "e";
                 break;
             case NE:
+                predicate = "ne";
                 break;
+            default: predicate = "error";
         }
-        out.bufferCode("/* CompareInst: "+ "*/");
-        int dstVarStackPos = getLocalVarStackPos(i.getDst().getName())*(-8);
+        out.bufferCode("/* CompareInst: "+ predicate +"*/");
         int leftOperandStackPos = getLocalVarStackPos(i.getLeftOperand().getName())*(-8);
+        out.bufferCode("movq " + leftOperandStackPos + "(%rbp), %r10");
         int rightOperandStackPos = getLocalVarStackPos(i.getRightOperand().getName())*(-8);
+        out.bufferCode("movq " + rightOperandStackPos + "(%rbp), %r11");
+        out.bufferCode("cmp %r10, %r11");  // compare left with right
+        out.bufferCode("movq $0, %r11");
+        out.bufferCode("movq $1, %r10");
+        out.bufferCode("cmov" + predicate + " %r10, %r11");
+        int dstVarStackPos = getLocalVarStackPos(i.getDst().getName())*(-8);
+        out.bufferCode("movq %r11, " + dstVarStackPos + "(%rbp)");
     }
 
     public void visit(CopyInst i) {
@@ -259,9 +272,12 @@ public final class CodeGen extends InstVisitor {
         } else if (srcVal instanceof IntegerConstant){
             srcStr = "$" + ((IntegerConstant) srcVal).getValue();
         } else if (srcVal instanceof LocalVar){
-            srcStr = (getLocalVarStackPos(((LocalVar) srcVal).getName())*(-8))+ "(%rbp)";
+            // first load it to a temp and then we use that instead.
+            out.bufferCode("movq "+getLocalVarStackPos(((LocalVar) srcVal).getName())*(-8)+ "(%rbp), %r10");
+            srcStr = "%r10";
         } else if (srcVal instanceof AddressVar){
-            srcStr = ((AddressVar) srcVal).getName().substring(1) + "@GOTPCREL(%rip)";
+//            srcStr = ((AddressVar) srcVal).getName().substring(1) + "@GOTPCREL(%rip)";
+            srcStr = "This should not happen???";
         }
 //        else {
 //            // ??
@@ -270,6 +286,13 @@ public final class CodeGen extends InstVisitor {
     }
 
     public void visit(JumpInst i) {
+        String jumpDst = curr_label_map.get(i.getNext(1));
+        out.bufferCode("/* Jumpinst */");
+        int predicateStackPos = getLocalVarStackPos(i.getPredicate().getName())*(-8);
+        out.bufferCode("movq " + predicateStackPos + "(%rbp), %r10");
+        out.bufferCode("movq $1, %r11");
+        out.bufferCode("cmp %r10, %r11");
+        out.bufferCode("je " + jumpDst);
     }
 
     public void visit(LoadInst i) {
