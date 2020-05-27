@@ -194,9 +194,56 @@ public final class CodeGen extends InstVisitor {
     }
 
     public void visit(BinaryOperator i) {
+        String opStr;
+        switch (i.getOperator()){
+            case Add: opStr = "add"; break;
+            case Sub: opStr = "sub"; break;
+            case Div: opStr = "idiv"; break;
+            case Mul: opStr = "imul"; break;
+            default: opStr = "ERROR"; break;
+        }
+        out.bufferCode("/* BinaryOperator: "+ opStr +"*/");
+
+        if (opStr.equals("idiv")){  // differently has to do with rdx and rax
+            return;
+        }
+        // first we load the left operand to %r10
+        LocalVar leftOperand = i.getLeftOperand();
+        int leftOperandStackPos = getLocalVarStackPos(leftOperand.getName())*(-8);
+        out.bufferCode("movq "+ leftOperandStackPos + "(%rbp), %r10");
+        // similarly for right operand to %r11
+        LocalVar rightOperand = i.getRightOperand();
+        int rightOperandStackPos = getLocalVarStackPos(rightOperand.getName())*(-8);
+        out.bufferCode("movq "+ leftOperandStackPos + "(%rbp), %r11");
+        // then we perform the operation with %r10 as destination (for subtraction)
+        out.bufferCode(opStr + " %r11, %r10");
+        // then store the result to the dstVar stack position
+        LocalVar dstVar = i.getDst();
+        int dstVarStackPos = getLocalVarStackPos(dstVar.getName())*(-8);
+        out.bufferCode("movq %r10, "+ dstVarStackPos + "(%rbp)");
     }
 
     public void visit(CompareInst i) {
+        String predicate;
+        switch (i.getPredicate()){
+            case GE:
+                predicate = "";
+                break;
+            case GT:
+                break;
+            case LE:
+                break;
+            case LT:
+                break;
+            case EQ:
+                break;
+            case NE:
+                break;
+        }
+        out.bufferCode("/* CompareInst: "+ "*/");
+        int dstVarStackPos = getLocalVarStackPos(i.getDst().getName())*(-8);
+        int leftOperandStackPos = getLocalVarStackPos(i.getLeftOperand().getName())*(-8);
+        int rightOperandStackPos = getLocalVarStackPos(i.getRightOperand().getName())*(-8);
     }
 
     public void visit(CopyInst i) {
@@ -253,7 +300,10 @@ public final class CodeGen extends InstVisitor {
 
     public void visit(ReturnInst i) {
         out.bufferCode("/* ReturnInst */");
-
+        int returnValStackPos = getLocalVarStackPos(i.getReturnValue().getName())*(-8);
+        out.bufferCode("movq " + returnValStackPos + "(%rbp), %rax");
+        out.bufferCode("leave");
+        out.bufferCode("ret");
     }
 
     private int getOverflowParamPos(){
@@ -301,5 +351,11 @@ public final class CodeGen extends InstVisitor {
     }
 
     public void visit(UnaryNotInst i) {
+        out.bufferCode("/* UnaryNotInst */");
+        int dstVarStackPos = getLocalVarStackPos(i.getDst().getName())*(-8);
+        int innerStackPos = getLocalVarStackPos(i.getInner().getName())*(-8);
+        out.bufferCode("movq " + innerStackPos + "(%rbp), %r10");
+        out.bufferCode("not %r10");
+        out.bufferCode("movq %r10, " + dstVarStackPos + "(%rbp)");
     }
 }
