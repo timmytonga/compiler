@@ -88,8 +88,9 @@ public final class CodeGen extends InstVisitor {
                     out.bufferCode("movq %r9, "+ stackPos + "(%rbp)");
                     break;
                 default:  // more than 6 args
-                    int stackPosOverflowArgs = (argIndex-4)*8;
-                    out.bufferCode("movq " + stackPosOverflowArgs + "(%rbp), " + stackPos + "(%rbp)");
+                    int stackPosOverflowArgs = (argIndex-3)*8;
+                    out.bufferCode("movq " + stackPosOverflowArgs + "(%rbp), %r10");
+                    out.bufferCode("movq %r10, " + stackPos + "(%rbp)");
             }
             argIndex++;
         }
@@ -332,6 +333,16 @@ public final class CodeGen extends InstVisitor {
     private int getOverflowParamPos(){
         return (numLocalVar++)*(-8);  // does this affect my localVarStack??
     }
+    public void addOverflowParam(List<Value> valueList){
+        if (valueList.size() > 6){
+            for (int i = valueList.size() - 1; i > 5; i--){
+                Value param = valueList.get(i);
+                int stackPos = getLocalVarStackPos(param.toString())*(-8);  // WARNING: assuming it's a LocalVar with a pos on stack
+                out.bufferCode("movq " + stackPos + "(%rbp), %r10");
+                out.bufferCode("movq %r10, " + getOverflowParamPos() + "(%rbp)");
+            }
+        }
+    }
     public void visit(CallInst i) {
         out.bufferCode("/* CallInst */");
         String funcName = i.getCallee().getName().substring(1);
@@ -360,10 +371,15 @@ public final class CodeGen extends InstVisitor {
                     out.bufferCode("movq " + stackPos + "(%rbp)" + ", %r9");
                     break;
                 default:  // more than 6 params --> we push on top of stack
-                    out.bufferCode("movq " + stackPos + "(%rbp)" + ", "+ getOverflowParamPos() +"(%rbp)");
+                    break;
+//                    int pos = getOverflowParamPos();
+//                    out.bufferCode("movq " + stackPos + "(%rbp), %r10");
+//                    out.bufferCode("movq %r10, " + pos + "(%rbp)");
+//                    //out.bufferCode("movq " + stackPos + "(%rbp)" + ", "+ getOverflowParamPos() +"(%rbp)");
             }
             paramIndex++;
         }
+        addOverflowParam(paramList);
         // now after loading the params, we call the function
         out.bufferCode("call "+ funcName);
         // now we handle return
