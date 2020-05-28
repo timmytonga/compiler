@@ -26,7 +26,7 @@ public final class CodeGen extends InstVisitor {
     public void genCode() {
         for (Iterator<GlobalDecl> it = p.getGlobals(); it.hasNext(); ) {
             GlobalDecl globalDecl = it.next();
-            out.printCode(".comm " + globalDecl.getAllocatedAddress().getName().substring(1) + ", " + ((IntegerConstant)globalDecl.getNumElement()).getValue() + ", 8");
+            out.printCode(".comm " + globalDecl.getAllocatedAddress().getName().substring(1) + ", " + ((IntegerConstant)globalDecl.getNumElement()).getValue()*8 + ", 8");
         }
 
         for (Iterator<Function> it = p.getFunctions(); it.hasNext();){
